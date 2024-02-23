@@ -24,7 +24,7 @@
 	sub %ax, %ax
 	mov %ax, %ds
 	mov %ax, %ss
-	mov $0xf000, %esp
+	mov $0xf000, %esp	# Set the stack pointer as 0xf000.
 
 # Configure serial port so we can report progress without connected VGA.
 # See [IntrList] for details.
