@@ -64,7 +64,7 @@ read_mbr:
 
 	# Check for MBR signature--if not present, it's not a
 	# partitioned hard disk.
-	cmpw $0xaa55, %es:510
+	cmpw $0xaa55, %es:510	# the last two byte of loaded sector (Boot Signature)
 	jne next_drive
 
 	mov $446, %si			# Offset of partition table entry 1.
