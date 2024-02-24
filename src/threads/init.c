@@ -133,7 +133,47 @@ pintos_init (void)
     /* Run actions specified on kernel command line. */
     run_actions (argv);
   } else {
-    // TODO: no command line passed to kernel. Run interactively 
+    // TODO: no command line passed to kernel. Run interactively
+    size_t max_len_buffer = 16;
+    size_t index_buffer = 0;
+    char input_buffer[max_len_buffer];
+    const uint8_t BACKSPACE = 127;
+    const uint8_t NEWLINE = 13;
+
+    while (true)
+    {
+      /*Clear the buffer as a new prompt starts.*/
+      index_buffer = 0;
+      memset (input_buffer, 0, sizeof(input_buffer));
+      printf ("PKUOS>");
+      bool refresh_buffer = false;
+      /*Stay at the current buffer until the user hits a newline or the buffer overflows.*/
+      while (!refresh_buffer) {
+        uint8_t inputc = input_getc (); // get one character input from the user.
+
+        if (inputc == BACKSPACE) {  // When the input character is a backspace, clear one character in the buffer.
+          if (index_buffer > 0) {
+            index_buffer--;
+            input_buffer[index_buffer] = '\0';
+            printf ("\b \b"); // move the cursor back, print a space, and then move it back again.
+          }
+        } else if ((inputc == NEWLINE) || (inputc >= 32 && inputc <= 126)){  // When the input character is printable or a newline, print out the input character.
+          input_buffer[index_buffer++] = inputc;
+          putchar (inputc);
+          if ((inputc == NEWLINE) || (index_buffer >= max_len_buffer)) {
+            refresh_buffer = true;
+            printf ("\n");
+          }
+        }
+      }
+      if (!strcmp (input_buffer, "whoami\r")) {
+        printf ("2000017814\n");
+      } else if (!strcmp (input_buffer, "exit\r")) {
+        break;
+      } else {
+        printf ("invalid command\n");
+      }
+    }
   }
 
   /* Finish up. */
