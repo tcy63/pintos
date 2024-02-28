@@ -135,43 +135,51 @@ pintos_init (void)
   } else {
     // TODO: no command line passed to kernel. Run interactively
     size_t max_len_buffer = 16;
-    size_t index_buffer = 0;
     char input_buffer[max_len_buffer];
+
+    size_t index_buffer = 0;
+
     const uint8_t BACKSPACE = 127;
     const uint8_t NEWLINE = 13;
 
     while (true)
     {
-      /*Clear the buffer as a new prompt starts.*/
       index_buffer = 0;
-      memset (input_buffer, 0, sizeof(input_buffer));
-      printf ("PKUOS>");
-      bool refresh_buffer = false;
-      /*Stay at the current buffer until the user hits a newline or the buffer overflows.*/
-      while (!refresh_buffer) {
-        uint8_t inputc = input_getc (); // get one character input from the user.
+      memset (input_buffer, 0, sizeof(input_buffer)); // Clear the buffer before a new prompt starts.
 
-        if (inputc == BACKSPACE) {  // When the input character is a backspace, clear one character in the buffer.
+      printf ("PKUOS>");  // Initialize a new prompt to get user inputs.
+
+      bool refresh_buffer = false;  // Stay at the current buffer until the user hits a newline or the buffer overflows.
+
+      while (!refresh_buffer) {
+        uint8_t inputc = input_getc (); // Get one character input from the user.
+        if (inputc == BACKSPACE) {
+          // When the input character is a backspace, clear one character in the buffer.
+          // Or do nothing if there is nothing in the buffer.
           if (index_buffer > 0) {
             index_buffer--;
             input_buffer[index_buffer] = '\0';
-            printf ("\b \b"); // move the cursor back, print a space, and then move it back again.
+            printf ("\b \b"); // Move the cursor back, print a space, and then move it back behind the space.
           }
-        } else if ((inputc == NEWLINE) || (inputc >= 32 && inputc <= 126)){  // When the input character is printable or a newline, print out the input character.
+        } else if ((inputc == NEWLINE) || (inputc >= 32 && inputc <= 126)){
+          // When the input character is printable, print out the input character.
           input_buffer[index_buffer++] = inputc;
           putchar (inputc);
           if ((inputc == NEWLINE) || (index_buffer >= max_len_buffer)) {
+            // Especially when the input character is a newline or when it exceeds maximum length, refresh the buffer.
             refresh_buffer = true;
             printf ("\n");
           }
         }
       }
+      //Everytime the buffer is refreshed, check the previous inputs to the buffer and react accordingly.
       if (!strcmp (input_buffer, "whoami\r")) {
-        printf ("2000017814\n");
+        printf ("2000017814\n"); // Print my student ID.
       } else if (!strcmp (input_buffer, "exit\r")) {
+        printf ("exit!\n"); // Leave the interactive session.
         break;
       } else {
-        printf ("invalid command\n");
+        printf ("invalid command\n"); // Indicate an invalid command.
       }
     }
   }
