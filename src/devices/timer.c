@@ -30,12 +30,19 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+static void wake_up_thread ();
+static bool thread_expire_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED);
 /** Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
 timer_init (void) 
 {
+  /** Configure the Programmable Interval Timer (PIT) hardware (system timer). */
   pit_configure_channel (0, 2, TIMER_FREQ);
+  /* Register the interrupt handler for this timer (time interrupt). 
+      This is the function the kernel runs in response to the interrupt.
+      It runs in a special context called interrupt context. */
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
 
@@ -91,9 +98,25 @@ timer_sleep (int64_t ticks)
 {
   int64_t start = timer_ticks ();
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  /** Get the sleeping thread queue. */
+  struct list *sleeping_threads = get_sleeping_threads ();
+  struct thread *idle_thread = get_idle_thread ();
+
+  /** Get the current running thread and set its supposed-to-wakeup time. */
+  struct thread *current_thread = thread_current ();
+  current_thread->expire = ticks + start;
+  
+  enum intr_level old_level;
+  if ((ticks > 0) && (current_thread != idle_thread) && (timer_elapsed (start) <= ticks)) {
+    old_level = intr_disable ();
+    list_insert_ordered (sleeping_threads, &(current_thread->sleepingelem), thread_expire_less, NULL);
+    /** Set the current thread to sleep. This version of thread_block() function assumes
+     * interrupt is disabled.
+     * TODO: use synchronization primitives instead of disabling interrupts.
+    */
+    thread_block ();
+    intr_set_level (old_level);
+    }
 }
 
 /** Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,6 +195,35 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+
+  /** Wake up deferred threads. */
+  /** TODO: figure out why doing waking-up at interrupt handler is better. */
+  wake_up_thread ();
+}
+
+/** Waking up sleeping threads according to current ticks.
+ * It is called inside the timer interrupt handler, thus working in the interrupt context.
+ * Interrupt context is non preemptable, and it cannot go into sleep.
+ */
+static void
+wake_up_thread ()
+{
+  struct list_elem *e;
+  struct list *sleeping_threads = get_sleeping_threads ();
+  e = list_head (sleeping_threads);
+  while ((e = list_next (e)) != list_end (sleeping_threads)) {
+    struct thread *to_wake_thread = list_entry (e, struct thread, sleepingelem);
+    if ((to_wake_thread->expire <= ticks)) {
+      /** Atomically unblock the thread and update other data.
+       * This changes its state to READY, and pushes it to the back of the ready thread queue.
+       * It can later be scheduled out of the ready queue.
+      */
+      thread_unblock (to_wake_thread);  
+      list_pop_front (sleeping_threads);
+    }
+    else
+      break;
+  }
 }
 
 /** Returns true if LOOPS iterations waits for more than one timer
@@ -243,4 +295,17 @@ real_time_delay (int64_t num, int32_t denom)
      the possibility of overflow. */
   ASSERT (denom % 1000 == 0);
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
+}
+
+
+/** Returns true if thread A had a less expire time than B, false
+   otherwise. */
+static bool
+thread_expire_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, sleepingelem);
+  const struct thread *b = list_entry (b_, struct thread, sleepingelem);
+  
+  return a->expire < b->expire;
 }

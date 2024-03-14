@@ -28,6 +28,8 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+static struct list sleeping_list;
+
 /** Idle thread. */
 static struct thread *idle_thread;
 
@@ -93,11 +95,15 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
 
+  list_init (&sleeping_list);
+
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+  initial_thread->expire=0;
 }
 
 /** Starts preemptive thread scheduling by enabling interrupts.
@@ -464,8 +470,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
+  t->expire = 0;  /** Add a field to record supposed-to-wakeup time. */
+
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
+
+  // list_push_back (&sleeping_list, &t->sleepingelem);
+
   intr_set_level (old_level);
 }
 
@@ -496,6 +507,11 @@ next_thread_to_run (void)
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
 }
 
+struct thread *
+get_next_thread_to_run (void) 
+{
+  return next_thread_to_run ();
+}
 /** Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
 
@@ -582,3 +598,16 @@ allocate_tid (void)
 /** Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+
+/** A pointer to the list of sleeping threads. */
+struct list*
+get_sleeping_threads (void)
+{
+  return &sleeping_list;
+}
+
+struct thread *get_idle_thread (void)
+{
+  return idle_thread;
+}

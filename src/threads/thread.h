@@ -88,7 +88,9 @@ struct thread
     char name[16];                      /**< Name (for debugging purposes). */
     uint8_t *stack;                     /**< Saved stack pointer. */
     int priority;                       /**< Priority. */
+    int expire;                         /**< Expected ticks to wakeup. */
     struct list_elem allelem;           /**< List element for all threads list. */
+    struct list_elem sleepingelem;      /**< List element for sleeping threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /**< List element. */
@@ -138,4 +140,6 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+struct list *get_sleeping_threads (void);
+struct thread *get_idle_thread (void);
 #endif /**< threads/thread.h */
